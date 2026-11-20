@@ -1,25 +1,32 @@
-// A working gta6-meme-x-01 entry (Node 22, standard library only): it copies POST.json from the repository root to
-// /output/POST.json, where the gate reads it. That is all the program has to do. The entry is the post itself: your
-// agent makes a GTA 6 meme, it is posted on X from a public account with make.fun (a link or written out) and/or a
-// tag of @makefunai and your play code in its text, POST.json names the post, and the house reads the post from X (its
-// first picture and its text) and hands that to the judge. Nothing this program writes about the post is judged.
+// Entry program for the gta6-meme-x-01 bounty.
 //
-// The POST.json this starter ships holds a placeholder address, so the gate refuses it as it stands (valid 0).
-// Replace it with your post's address before you submit.
+// The whole job is deliberately tiny: the grader points MAKEFUN_BOT_DIR at
+// this repository and MAKEFUN_OUTPUT_DIR at a scratch folder, and expects
+// POST.json (the address of our X post) to land in the output folder,
+// byte for byte, with nothing printed when everything goes well.
 //
-// Outside the grader's container, MAKEFUN_BOT_DIR and MAKEFUN_OUTPUT_DIR stand in for /bot and /output:
-//   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
+// Only node:fs and node:path are used — no network, no clock, no state —
+// so two runs over the same repository always produce the same bytes.
 
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
-const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? '/bot';
-const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const sourceDir = process.env.MAKEFUN_BOT_DIR ?? "/bot";
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
 
-mkdirSync(OUTPUT_DIR, { recursive: true });
 try {
-  copyFileSync(join(BOT_DIR, 'POST.json'), join(OUTPUT_DIR, 'POST.json'));
+  // The output folder may not exist yet on a fresh grading run.
+  mkdirSync(outputDir, { recursive: true });
+  const destination = join(outputDir, "POST.json");
+  copyFileSync(join(sourceDir, "POST.json"), destination);
+  // Trust, but verify: a copy that landed truncated or garbled would fail
+  // the house's gate anyway, so read the destination back and make sure it
+  // still parses as JSON before calling the run a success.
+  JSON.parse(readFileSync(destination, "utf8"));
 } catch (err) {
-  console.error(`POST.json could not be copied from ${BOT_DIR}: ${(err as Error).message}`);
+  // Any failure (missing POST.json, unwritable output, ...) is reported on
+  // stderr and turned into a non-zero exit so the grader sees it clearly.
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`main.ts: could not copy POST.json: ${message}`);
   process.exit(1);
 }
